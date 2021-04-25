@@ -5,7 +5,7 @@ data_path = 'US_testImages/';
 
 tfiles=dir([data_path '*.mat']);
 
-for k=1:numel(tfiles)
+parfor k=1:numel(tfiles)
     if (mod(k, 50)) == 0
         k
     end
@@ -18,5 +18,8 @@ for k=1:numel(tfiles)
 
     St = scat(double(img), Wop);
     S = format_scat(St);
+end
+
+function saver(name)
     save(['sc_bcet/' name], 'S');
 end
