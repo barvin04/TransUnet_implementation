@@ -10,7 +10,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from scipy.ndimage import zoom
-from datasets.dataset_us_xray import Ultrasound_dataset, LungXray_dataset
+from datasets.dataset_us_xray_scat import Ultrasound_dataset, LungXray_dataset
 from utils import calculate_metric_percase
 from networks.TransUNet_model import TransUNet
 
@@ -34,19 +34,20 @@ parser.add_argument('--model_path', type=str,
 parser.add_argument('--img_size', type=int, default=224, help='input patch size of network input')
 args = parser.parse_args()
 
-def test_single_volume(image, label, net, classes, patch_size=[256, 256], case=None):
+def test_single_volume(image, label, scat_mat_batch, net, classes, patch_size=[256, 256], case=None):
     image, label = image.squeeze(0).cpu().detach().numpy(), label.squeeze(0).cpu().detach().numpy()
+    scat_mat_batch = scat_mat_batch.cuda()
     if len(image.shape) == 3:
         prediction = np.zeros_like(label)
         for ind in range(image.shape[0]):
             slice = image[ind, :, :]
             x, y = slice.shape[0], slice.shape[1]
             if x != patch_size[0] or y != patch_size[1]:
-                slice = zoom(slice, (patch_size[0] / x, patch_size[1] / y), order=3)
+                slice = zoom(slice, (patch_size[0] / x, patch_size[1] / y), order=3)  # previous using 0
             input = torch.from_numpy(slice).unsqueeze(0).unsqueeze(0).float().cuda()
             net.eval()
             with torch.no_grad():
-                outputs = net(input)
+                outputs = net(input, scat_mat_batch)
                 out = torch.argmax(torch.softmax(outputs, dim=1), dim=1).squeeze(0)
                 out = out.cpu().detach().numpy()
                 if x != patch_size[0] or y != patch_size[1]:
@@ -77,7 +78,8 @@ def inference(args, model):
     for i_batch, sampled_batch in tqdm(enumerate(testloader)):
         h, w = sampled_batch["image"].size()[2:]
         image, label, case_name = sampled_batch["image"], sampled_batch["label"], sampled_batch['case_name'][0]
-        metric_i = test_single_volume(image, label, model, classes=args.num_classes, patch_size=[args.img_size, args.img_size],
+        scat_mat_batch = sampled_batch['scat_mat']
+        metric_i = test_single_volume(image, label, scat_mat_batch, model, classes=args.num_classes, patch_size=[args.img_size, args.img_size],
                                       case=case_name)
         metric_list += np.array(metric_i)
         logging.info('idx %d case %s mean_dice %f mean_hd95 %f' % (i_batch, case_name, np.mean(metric_i, axis=0)[0], np.mean(metric_i, axis=0)[1]))
@@ -111,9 +113,9 @@ if __name__ == "__main__":
     args.Dataset = dataset_config[dataset_name]['Dataset']
     args.list_dir = dataset_config[dataset_name]['list_dir']
 
-    args.exp = dataset_name + str(args.img_size)
+    args.exp = dataset_name + '_scat_' + str(args.img_size)
 
-    net = TransUNet(num_classes=args.num_classes).cuda()
+    net = TransUNet(num_classes=args.num_classes, use_scat_encoder=True).cuda()
     if not os.path.exists(args.model_path):
         print("Model path doesn't exist \nExiting eval process.")
         exit()

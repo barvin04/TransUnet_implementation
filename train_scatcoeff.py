@@ -16,7 +16,7 @@ import torch.backends.cudnn as cudnn
 from torchvision import transforms
 from tensorboardX import SummaryWriter
 from networks.TransUNet_model import TransUNet
-from datasets.dataset_us_xray import Ultrasound_dataset, LungXray_dataset, RandomGenerator
+from datasets.dataset_us_xray_scat import Ultrasound_dataset, LungXray_dataset, RandomGenerator
 from utils import DiceLoss
 
 cudnn.benchmark = False
@@ -84,8 +84,10 @@ def training_loop(args, model, snapshot_path, dataset_name):
     for epoch_num in iterator:
         for i_batch, sampled_batch in enumerate(trainloader):
             image_batch, label_batch = sampled_batch['image'], sampled_batch['label']
+            scat_mat_batch = sampled_batch['scat_mat']
             image_batch, label_batch = image_batch.cuda(), label_batch.cuda()
-            outputs = model(image_batch)
+            scat_mat_batch = scat_mat_batch.cuda()
+            outputs = model(image_batch, scat_mat_batch)
             loss_ce = ce_loss(outputs, label_batch[:].long())
             loss_dice = dice_loss(outputs, label_batch, softmax=True)
             loss = 0.5 * loss_ce + 0.5 * loss_dice
@@ -141,6 +143,6 @@ if __name__ == "__main__":
     if not os.path.exists(args.models_save_dir):
         os.makedirs(args.models_save_dir)
 
-    net = TransUNet(num_classes=args.num_classes).cuda()
+    net = TransUNet(num_classes=args.num_classes, use_scat_encoder=True).cuda()
 
     training_loop(args, net, args.models_save_dir, dataset_name)
