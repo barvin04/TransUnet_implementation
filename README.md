@@ -37,6 +37,11 @@ Download the dataset,
 For lung images: [here](https://github.com/v7labs/COVID-19-xray-dataset)  
 For ultrasound images: [here](https://hc18.grand-challenge.org) 
 
+## Pre-processing
+To generate the scattering-coefficients for augmenting in TranUnet, use ScatteringCoeff_generator.m   
+For processing the ultrasound images use the US_generateMasks.py file.  
+And, for processing the lung images use rc_bcet.py file.
+
 ## TransUNet Eval
 python3 eval.py --dataset Ultrasound  --batch_size 12 --model_path /ssd_scratch/cvit/rupraze/models/ultrasound/epoch_120.pth
 ## TransUNet + Scattering coefficients Eval
